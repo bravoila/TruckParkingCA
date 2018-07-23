@@ -20,8 +20,8 @@ uniform_real_distribution<double> u(0, 1);
 
 const double L = 2000.0;                       //Total simulation distance unit in mile
 const int NumRA = 40;                                  //number of rest area
-const int MaxCy = 24;                          // max hours run in the simulation,see input file
-const int TT = MaxCy;                     // total simulation time, 16 = L/v
+const int MaxCy = 24;                          // max hours run in the simulation,see input file, can be 48...
+const int TT = MaxCy*2;                     // total simulation truck number
 
 //Three modes: driving, searching for parking, parking
 
@@ -72,6 +72,7 @@ struct TruckFlowStru
 {
     double ArrTime;    // arrival time , begin
     int ML;         // number of truck in the hour
+    double EnterLoc;    // entrance location
 };
 //partical OD
 
@@ -189,20 +190,30 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
         // truck cannot park randomly, a is actually the last RestArea number
         // the driver can park in order to obey HOS
         // find the parking for short rest
-        cir = int(floor((Truck->speed * legal) / L));
-        cout<<"(Truck->speed * legal - cir*L "<<(Truck->speed * legal - cir*L)<<endl;
+
         cout<<"Truck->speed * legal "<<Truck->speed * legal<<endl;
 
-
+/*
         for(int i = 0; i < NumRA; i++){
             if(DistER(Truck->Entryd.back(), i ,RestArea) == 0){
-                it = (i + m -1) % m;
+                it = i  -1;
             }
         }
+*/
 
-        while (((Truck->speed * legal - cir*L) < DistER(Truck->Entryd.back(),it,RestArea)))
+        //if the truck drives out of the segment, drop the data point
+        if((Truck->speed * legal) >  DistER(Truck->Entryd.back(),m-1,RestArea)){
+            Truck->BP.clear();//error code for the truck, the data point will be dropped
+            Truck->RN.clear();
+            Truck->RestTime.clear();
+            Truck->Entryd.clear();
+            Truck->Exitd.clear();
+            return;
+        }
+
+        while (((Truck->speed * legal) < DistER(Truck->Entryd.back(),it,RestArea)))
         {
-            it = (it + m -1) % m;
+            it = it  -1;
         };
 
         a = it;
@@ -216,7 +227,7 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
         //a is nearest RestArea
 
         Truck->RN.push_back(PreferS(a));     //rest area for short rest
-        Truck->BP.back() = Truck->StartT + (DistER(Truck->Entryd.back(),a,RestArea)+ cir*L) / Truck->speed;
+        Truck->BP.back() = Truck->StartT + (DistER(Truck->Entryd.back(),a,RestArea)) / Truck->speed;
         // short rest time
         s1 = int(floor(Truck->BP.back())) ;//Time truck enters the RestArea[a], round down
         s2 = int(ceil(Truck->BP.back() + Truck->RestTime.at(Truck->RestTime.size()-2)));//Time the truck leave the rest area, round up
@@ -232,33 +243,53 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
         // the latter is the same as driving time function in the first part
         // truck driver driving time can be less than the regulation
 
+        it = a + 1; //reset it value; if a < m -1 (19), then try from next rest area, which is a +1;
+        //else when a = m -1, try from the first rest area, which is 0
+
+        rem = ((Truck->BP.back() - Truck->BP.at(Truck->BP.size()-2)  - Truck->RestTime.at(Truck->RestTime.size()-2))* Truck->speed);
+        //change here tomorrow, to lower and upper limit
+        if(rem >  DistRR(a,m -1,RestArea)){//here it = m-1
+            //Truck->BP.push_back(88);//error code for the truck, the data point will be dropped
+            return;
+        }
+
+        while(rem > DistRR(a,it,RestArea))
+        {//test whether the truck has left the segme
+            it = it + 1 ;
+            //cout<<rem<<" " <<DistRR(a,it,RestArea)<<endl;
+        }
+
     }else{// when the truck only have long rest in the observed section
         legal = min((Reg.MaxWL - Truck->DRbefore ), DrivingTime(nor1(e)));// nor1(e) is the first part driving time
         Truck->BP.push_back(Truck->StartT);
-        Truck->RN.push_back(0);// code for only observing the second part
+
         Truck->RestTime.at(Truck->RestTime.size()-2) = 0;
         Truck->BP.push_back(Truck->StartT + legal);
-        a = 0;// for continuing the following code
-    }
 
-    it = (a + 1) % m ; //reset it value; if a < m -1 (19), then try from next rest area, which is a +1;
-    //else when a = m -1, try from the first rest area, which is 0
+        a = 66;// code for only consider the second driving
+        Truck->RN.push_back(a);// code for only observing the second part
 
-//WARNING!! what if DistRR(a,it,RestArea))= 0?????????
-    cir = int(floor((Truck->BP.back() - Truck->BP.at(Truck->BP.size()-2)  - Truck->RestTime.at(Truck->RestTime.size()-2))* Truck->speed)  / L);
-    cout<<"cir "<<cir<<endl;
+        rem = ((Truck->BP.back() - Truck->BP.at(Truck->BP.size()-2)  - Truck->RestTime.at(Truck->RestTime.size()-2))* Truck->speed);
+        //change here tomorrow, to lower and upper limit
+        if(rem >  DistER(Truck->Entryd.back(),m -1,RestArea)){//here it = m-1 89757
+            //Truck->BP.push_back(88);//error code for the truck, the data point will be dropped
+            b= 77; // code for second part beyond highway limit
+            Truck->RN.push_back(b);
+            return;
+        }
+        else{
+            it = 0;
+            while(int(floor(Truck->Entryd.back()/ RestArea[it].location)) != 0)
+            {//test whether the truck has left the segment
+                it = it + 1;
+            }
+        }
 
-    rem = ((Truck->BP.back() - Truck->BP.at(Truck->BP.size()-2)  - Truck->RestTime.at(Truck->RestTime.size()-2))* Truck->speed - cir*L);
-    //change here tomorrow, to lower and upper limit
-    cout<<"m1"<<m<<endl;
-    if(rem > DistRR(a,(a + m -1) % m,RestArea) ){// this is the max distance between rest area, which !=L. Here (a+ m -1)%m is the previous restarea
-        rem = DistRR(a,(a + m -1 ) % m,RestArea);
-    }
-    cout<<"m2"<<m<<endl;
-    while(rem > DistRR(a,it,RestArea))
-    {//test whether the truck has left the segme
-        it = (it + 1) % m ;
-        cout<<rem<<" " <<DistRR(a,it,RestArea)<<endl;
+        while(rem > DistER(Truck->Entryd.back(),it,RestArea))
+        {//test whether the truck has left the segme
+            it = it + 1 ;
+            cout<<rem<<" " <<DistRR(a,it,RestArea)<<endl;
+        }
     }
 
     if(it == 0){
@@ -348,11 +379,11 @@ int main() {
 
     infile_r.close();
 
-
+/*
 
 
     //###################### POD ###############################
-/*  // POD is not needed in circular simulation
+  // POD is not needed in circular simulation
     // entrance{distance to point 0,number of trucks entering}
     struct EnterExitStru POD[et];
     // input partical OD info
@@ -383,11 +414,10 @@ int main() {
         tn = tn + POD[l].num; //total number of trucks simulated ( including enter);
     }
     //###############################################
-*/
 
+*/
     //arrival time for each truck
-    TruckFlowStru TruckFlow[MaxCy];
-    cout<<"MaxCy = "<<MaxCy<<endl;
+    TruckFlowStru TruckFlow[TT];
 
     ifstream infile_t("Truck_arr.txt",ios::in);
     if(!infile_t)
@@ -398,10 +428,9 @@ int main() {
 
     j = 0;
 
-    while(!infile_t.eof() && j < MaxCy)
+    while(!infile_t.eof() && j < TT)
     {
-        infile_t >> TruckFlow[j].ArrTime >> TruckFlow[j].ML;
-        cout<<j<<"  "<<TruckFlow[j].ML<<endl;
+        infile_t >> TruckFlow[j].ArrTime >> TruckFlow[j].ML>>TruckFlow[j].EnterLoc;
         j++;
     }
 
@@ -409,27 +438,28 @@ int main() {
     cout<<"here"<<endl;
 
     vector<double> arrival;
+    vector<double> startpoint;
 
-    for ( i = 0 ; i < MaxCy; i++)
+    for ( i = 0 ; i < TT; i++)//!!!!need to change Maxcy, possiblly, Maxcy * (number of entrance +1)
     {
-
-        n = n + TruckFlow[i].ML ;
+        n = n + TruckFlow[i].ML ;// n is total number of trucks
     }
     cout<<"n ="<<n<<endl;
     cout<<TruckFlow[0].ML<<endl;
 
-    for(i = 0; i< MaxCy; i++)
+    for(i = 0; i< TT; i++)
     {
         for(j = 0; j< TruckFlow[i].ML; j++)
         {
             arrival.push_back((TruckFlow[i].ArrTime + u(e)));
+            startpoint.push_back((TruckFlow[i].EnterLoc));
         }
     }
-    for(i =0; i< n; i++)
+    for(i =0; i< n; i++)//delete later
     {
         cout<<arrival.at(i)<<endl;
+        cout<<startpoint.at(i)<<endl;
     }
-
 
 
 
@@ -455,13 +485,12 @@ int main() {
         // short and long rest time
         Truck.RestTime.push_back(lgn2(e));// rest time distribution truck leaves the RestArea[a], round up default lgn2(e)
         Truck.RestTime.push_back(5*u(e)+10);//5*u(e)+10 ( at least 10 hour rest)
-        Truck.Entryd.push_back(0.1);
+        Truck.Entryd.push_back(startpoint.at(i));
         outFile <<i<<","<< Truck.StartT <<",";
+
         Truck2RestC(&Truck, RestArea,REE,m);//function
         Truck.Exitd.push_back(RestArea[Truck.RN.back()].location);
-        cout<<"!!!!!!!!!!!!!SIZE"<<Truck.BP.size()<<endl;
         cout<<"############################## n = "<<n <<endl;
-
 
 
 
@@ -484,6 +513,11 @@ int main() {
         REE.clear();
         count = 0;
     }
+
+    // ######################### Entrance ########################################
+
+
+
 
     /*
      outFile<<"Partial OD \n"<<endl;
@@ -543,7 +577,7 @@ int main() {
     outFile.close();
 
     //output RestArea
-    outFile.open("RestArea503.csv");
+    outFile.open("RestArea504.csv");
     outFile << " Number of trucks in short rest \n" <<endl;
     outFile << "RestArea"<<","<<"Time"<<","<<"Number of trucks"<<endl;
 
@@ -551,7 +585,7 @@ int main() {
     {
         outFile <<"RestArea"<< j<<"\n";
         outFile<<"Time ";
-        for ( t = 0; t <TT; t++)
+        for ( t = 0; t <MaxCy; t++)
         {
             outFile <<t<<"," ;
             if(t % 24 == 0 && t !=0){
@@ -561,7 +595,7 @@ int main() {
         }
         outFile <<endl;
         outFile<<"Snum ";
-        for ( t = 0; t <TT; t++)
+        for ( t = 0; t <MaxCy; t++)
         {
             outFile <<RestArea[j].Snum[t]<<"," ;
             if(t % 24 == 0 && t !=0){
@@ -572,7 +606,7 @@ int main() {
         outFile <<endl;
 
         outFile<<"Lnum ";
-        for ( t = 0; t <TT; t++)
+        for ( t = 0; t <MaxCy; t++)
         {
             outFile <<RestArea[j].Lnum[t]<<"," ;
             if(t % 24 == 0 && t !=0){
