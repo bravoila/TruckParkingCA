@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/Truck_Parking_CA.dir/main.cpp.o  -o Truck_Parking_CA 
