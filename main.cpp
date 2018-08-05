@@ -18,11 +18,11 @@ uniform_real_distribution<double> u(0, 1);
 // for data generation
 // change NumRA , RestA_info, Truck_info1.csv, RestArea1.csv
 
-const double L = 2000.0;                       //Total simulation distance unit in mile
-const int NumRA = 7;                                  //number of rest area
-const int MaxCy = 24;                          // max hours run in the simulation,see input file, can be 48...
-const int TT = MaxCy*2;                     // total simulation truck number(entering)
-const int TT2 = MaxCy*2;                     // total simulation truck number(exit)
+//const double L = 2000.0;                       //Total simulation distance unit in mile
+const int NumRA = 9;                                  //number of rest area
+const int MaxCy = 48;                          // max hours run in the simulation,see input file, can be 48...
+const int TT = MaxCy*7;                     // total simulation truck number(entering)
+const int TT2 = MaxCy*7;                     // total simulation truck number(exit)
 
 //Three modes: driving, searching for parking, parking
 
@@ -137,8 +137,8 @@ double DrivingTime(double a)
         DrivingTime(abs(a)) ;
     }else if(a > 7.99){
         DrivingTime(abs(a - 7.99));
-    }else if(a < 2){
-        return 2;
+    }else if(a < 1){
+        return 1;
     }else{
         return a;
     };
@@ -162,8 +162,8 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
     std::mt19937 e(rd());
     //https://gaomf.cn/2017/03/22/C++_Random/
 
-    normal_distribution<double> nor1(7.5,0.5);   //Normal distribution, use for first driving time 7.5,15
-    normal_distribution<double> nor2(2.5,0.5);   //Normal distribution, use for second driving time 2.5,15
+    normal_distribution<double> nor1(7.5,0.6);   //Normal distribution, use for first driving time 7.5,15
+    normal_distribution<double> nor2(3,0.6);   //Normal distribution, use for second driving time 2.5,15
 
     //https://homepage.divms.uiowa.edu/~mbognar/applets/normal.html
     m = NumRA;
@@ -172,7 +172,6 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
     int b = 0;                       // store the RestArea number of LONG rest
     int s1 = 0;                      // store the entering time of SHORT and LONG rest
     int s2 = 0;                      // store the leaving time number of SHORT LONG rest, in 1 hour interval
-    int cir = 0;                        // number of loop the truck drive
     double rem = 0;                     // remaining distance after deduction circle
     double legal = 0;                   // record legal driving time
     RegulationStru Reg = {8.0,11.0};     // USDOT HOS Regulation
@@ -293,7 +292,7 @@ void Truck2RestC(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],vec
 
     if(it == 0){
         b = m -1;
-    }else if(it == (a + 1) % m) {
+    }else if(it == a + 1 & a != 66) {
         b = a;
     }else{
         b = it -1;
@@ -326,8 +325,8 @@ void Truck2RestEx(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],ve
     std::mt19937 e(rd());
     //https://gaomf.cn/2017/03/22/C++_Random/
 
-    normal_distribution<double> nor1(7.5,0.5);   //Normal distribution, use for first driving time 7.5,15
-    normal_distribution<double> nor2(2.5,0.5);   //Normal distribution, use for second driving time 2.5,15
+    normal_distribution<double> nor1(7.5,0.6);   //Normal distribution, use for first driving time 7.5,15
+    normal_distribution<double> nor2(3,0.6);   //Normal distribution, use for second driving time 2.5,15
 
     //https://homepage.divms.uiowa.edu/~mbognar/applets/normal.html
     m = NumRA;
@@ -456,7 +455,7 @@ void Truck2RestEx(struct TruckPropStru *Truck, struct RestAreaStru RestArea[],ve
 
     if(it == 0){
         b = m -1;
-    }else if(it == (a + 1) % m) {
+    }else if(it == a + 1 & a != 66) {
         b = a;
     }else{
         b = it -1;
@@ -654,7 +653,7 @@ int main() {
         m = NumRA;
         Truck.speed = 65;  //assume speed is 65 mph
         //################################  Set distributions   ##################################
-        Truck.DRbefore = 9*u(e);// Driving time before entering the highway
+        Truck.DRbefore = 4*u(e);// Driving time before entering the highway
         Truck.StartT = arrival.at(i); //Arrival function at entrance. In the future it can be replaced by traffic flow function
         // short and long rest time
         Truck.RestTime.push_back(lgn2(e));// rest time distribution truck leaves the RestArea[a], round up default lgn2(e)
@@ -697,7 +696,7 @@ int main() {
         m = NumRA;
         Truck.speed = 65;  //assume speed is 65 mph
         //################################  Set distributions   ##################################
-        Truck.DRbefore = 9*u(e) ;// Driving time before entering the highway
+        Truck.DRbefore = 4*u(e) ;// Driving time before entering the highway
         Truck.StartT = arrival2.at(i); //Arrival function at entrance. In the future it can be replaced by traffic flow function
         // short and long rest time
         Truck.RestTime.push_back(lgn2(e));// rest time distribution truck leaves the RestArea[a], round up default lgn2(e)
